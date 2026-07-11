@@ -78,7 +78,12 @@ function Write-Utf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Value, $encoding)
 }
 
-$projectRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputDirectory))
+if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+    $projectRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
+}
+else {
+    $projectRoot = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputDirectory))
+}
 
 if (-not (Test-Path -LiteralPath $projectRoot)) {
     New-Item -ItemType Directory -Force -Path $projectRoot | Out-Null
@@ -88,8 +93,13 @@ $packagePath = $Package.Replace('.', [System.IO.Path]::DirectorySeparatorChar)
 $javaDirectory = Join-Path $projectRoot "src/main/java/$packagePath"
 $javaFile = Join-Path $javaDirectory "$Name.java"
 $pomFile = Join-Path $projectRoot 'pom.xml'
+$ideaDirectory = Join-Path $projectRoot '.idea'
+$ideaWorkspaceFile = Join-Path $ideaDirectory 'workspace.xml'
 
-$plannedFiles = @($pomFile, $javaFile)
+$plannedFiles = @(
+    $pomFile,
+    $javaFile
+)
 $conflictingFiles = @($plannedFiles | Where-Object { Test-Path -LiteralPath $_ })
 if ($conflictingFiles.Count -gt 0 -and -not $Force) {
     $fileList = $conflictingFiles -join "`r`n"
@@ -97,6 +107,7 @@ if ($conflictingFiles.Count -gt 0 -and -not $Force) {
 }
 
 New-Item -ItemType Directory -Force -Path $javaDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $ideaDirectory | Out-Null
 
 $annotationEntries = [System.Collections.Generic.List[string]]::new()
 Add-AnnotationEntry $annotationEntries ('        name = "' + (Escape-JavaString $Name) + '"')
@@ -203,6 +214,17 @@ $pom = @"
                     <source>`${maven.compiler.source}</source>
                     <target>`${maven.compiler.target}</target>
                     <encoding>`${maven.compiler.encoding}</encoding>
+                    <proc>full</proc>
+                    <annotationProcessors>
+                        <annotationProcessor>org.powernukkitx.plugin.annotation.PluginAnnotationProcessor</annotationProcessor>
+                    </annotationProcessors>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.powernukkitx</groupId>
+                            <artifactId>server</artifactId>
+                            <version>nightly-SNAPSHOT</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
@@ -232,7 +254,21 @@ $pom = @"
 </project>
 "@
 
+$ideaWorkspace = @'
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PropertiesComponent">{}</component>
+</project>
+'@
+
 Write-Utf8NoBom $pomFile $pom
 Write-Utf8NoBom $javaFile $javaSource
+if ($Force -or -not (Test-Path -LiteralPath $ideaWorkspaceFile)) {
+    Write-Utf8NoBom $ideaWorkspaceFile $ideaWorkspace
+}
 
 Write-Host "Created $Name in $projectRoot"
+
+if (-not [string]::IsNullOrWhiteSpace($PSCommandPath) -and (Test-Path -LiteralPath $PSCommandPath)) {
+    Remove-Item -LiteralPath $PSCommandPath -Force
+}
