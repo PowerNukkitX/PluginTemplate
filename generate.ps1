@@ -181,10 +181,13 @@ $javaFile = Join-Path $javaDirectory "$Name.java"
 $pomFile = Join-Path $projectRoot 'pom.xml'
 $ideaDirectory = Join-Path $projectRoot '.idea'
 $ideaWorkspaceFile = Join-Path $ideaDirectory 'workspace.xml'
+$githubWorkflowDirectory = Join-Path $projectRoot '.github/workflows'
+$githubWorkflowFile = Join-Path $githubWorkflowDirectory 'build.yml'
 
 $plannedFiles = @(
     $pomFile,
-    $javaFile
+    $javaFile,
+    $githubWorkflowFile
 )
 $conflictingFiles = @($plannedFiles | Where-Object { Test-Path -LiteralPath $_ })
 if ($conflictingFiles.Count -gt 0 -and -not $Force) {
@@ -194,6 +197,7 @@ if ($conflictingFiles.Count -gt 0 -and -not $Force) {
 
 New-Item -ItemType Directory -Force -Path $javaDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $ideaDirectory | Out-Null
+New-Item -ItemType Directory -Force -Path $githubWorkflowDirectory | Out-Null
 
 $annotationEntries = [System.Collections.Generic.List[string]]::new()
 Add-AnnotationEntry $annotationEntries ('        name = "' + (Escape-JavaString $Name) + '"')
@@ -347,8 +351,89 @@ $ideaWorkspace = @'
 </project>
 '@
 
+$githubWorkflow = @'
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - '**'
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build-maven:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build with Maven
+        run: mvn -B package -DskipTests=false -Darguments="-Dmaven.javadoc.skip=true"
+
+      - name: Read project metadata
+        id: project
+        shell: bash
+        run: |
+          ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          FINAL_NAME=$(mvn help:evaluate -Dexpression=project.build.finalName -q -DforceStdout)
+
+          echo "artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "final_name=$FINAL_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "jar_path=target/$FINAL_NAME.jar" >> "$GITHUB_OUTPUT"
+
+      - name: Verify artifact
+        shell: bash
+        run: |
+          if [ ! -f "${{ steps.project.outputs.jar_path }}" ]; then
+            echo "${{ steps.project.outputs.jar_path }} was not created"
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{ steps.project.outputs.artifact_id }}
+          path: ${{ steps.project.outputs.jar_path }}
+
+      - name: Create GitHub release
+        if: github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+          else
+            RELEASE_TAG="${{ steps.project.outputs.tag }}"
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${{ steps.project.outputs.jar_path }}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${{ steps.project.outputs.jar_path }}" --target "${{ github.sha }}" --title "$RELEASE_TAG" --notes "Automated release for $RELEASE_TAG"
+          fi
+'@
+
 Write-Utf8NoBom $pomFile $pom
 Write-Utf8NoBom $javaFile $javaSource
+Write-Utf8NoBom $githubWorkflowFile $githubWorkflow
 if ($Force -or -not (Test-Path -LiteralPath $ideaWorkspaceFile)) {
     Write-Utf8NoBom $ideaWorkspaceFile $ideaWorkspace
 }
