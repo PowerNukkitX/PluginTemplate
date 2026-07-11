@@ -440,6 +440,11 @@ if ($Force -or -not (Test-Path -LiteralPath $ideaWorkspaceFile)) {
 
 Write-Host "Created $Name in $projectRoot"
 
+$runConfigurationDirectory = Join-Path $projectRoot '.run'
+if (Test-Path -LiteralPath $runConfigurationDirectory) {
+    Remove-Item -LiteralPath $runConfigurationDirectory -Recurse -Force
+}
+
 if (-not [string]::IsNullOrWhiteSpace($PSCommandPath) -and (Test-Path -LiteralPath $PSCommandPath)) {
     Remove-Item -LiteralPath $PSCommandPath -Force
 }
