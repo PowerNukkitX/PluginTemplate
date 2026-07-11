@@ -2,22 +2,25 @@
 
 PowerShell script for generating a minimal PowerNukkitX plugin project.
 
-## Usage
+## Quick Start
 
-Generate a plugin in the current directory:
+Create a new repository from this GitHub template, clone your new repository, then run the generator in the repository root:
 
 ```powershell
-.\generate.ps1 `
-  -Package org.powernukkitx.example `
-  -Name ExamplePlugin
+.\generate.ps1
 ```
 
-`Package` is used as the Java package and Maven `groupId`.
-`Name` is used as the plugin name, Maven `artifactId`, jar name, and main class.
+The script creates a Maven plugin project using defaults from the GitHub `origin` remote.
 
+After generation, open the directory in IntelliJ and import the Maven project when prompted. The generator script deletes itself after a successful run.
+<br>
+<br>
+<br>
+<br>
+<br>
 ## Optional Metadata
 
-`Author` is optional and defaults to `YourName`:
+`Author` is optional and defaults to the GitHub repository owner when available:
 
 ```powershell
 .\generate.ps1 `
@@ -48,6 +51,8 @@ All supported `PluginMeta` values can be supplied:
 Supported optional parameters:
 
 ```text
+Package
+Name
 Author
 Version
 Api
@@ -63,7 +68,9 @@ Force
 ```
 
 `Order` accepts `STARTUP` or `POSTWORLD`.
-
+<br>
+<br>
+<br>
 ## Build The Plugin
 
 Open the directory in IntelliJ or run Maven there:

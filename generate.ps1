@@ -1,13 +1,9 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidatePattern('^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$')]
     [string]$Package,
 
-    [Parameter(Mandatory = $true)]
-    [ValidatePattern('^[A-Za-z_][A-Za-z0-9_]*$')]
     [string]$Name,
 
-    [string[]]$Author = @('YourName'),
+    [string[]]$Author,
     [string]$Version = '1.0.0',
     [string[]]$Api = @('3.0.0'),
     [string]$Description,
@@ -68,6 +64,60 @@ function Add-AnnotationEntry {
     }
 }
 
+function ConvertTo-JavaIdentifier {
+    param(
+        [string]$Value,
+        [switch]$LowerCase
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    $parts = @($Value -split '[^A-Za-z0-9_]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($parts.Count -eq 0) {
+        return $null
+    }
+
+    $identifier = $parts -join ''
+    if ($LowerCase) {
+        $identifier = $identifier.ToLowerInvariant()
+    }
+
+    if ($identifier -notmatch '^[A-Za-z_]') {
+        $identifier = "_$identifier"
+    }
+
+    return $identifier
+}
+
+function Get-GitHubRepositoryInfo {
+    param([string]$RepositoryPath)
+
+    try {
+        $remoteUrl = git -C $RepositoryPath config --get remote.origin.url 2>$null
+    }
+    catch {
+        return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($remoteUrl)) {
+        return $null
+    }
+
+    $remoteUrl = $remoteUrl.Trim()
+    if ($remoteUrl -match '^https://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$' -or
+        $remoteUrl -match '^git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$') {
+        return [PSCustomObject]@{
+            Owner = $Matches[1]
+            Name = $Matches[2]
+            Url = "https://github.com/$($Matches[1])/$($Matches[2])"
+        }
+    }
+
+    return $null
+}
+
 function Write-Utf8NoBom {
     param(
         [string]$Path,
@@ -87,6 +137,42 @@ else {
 
 if (-not (Test-Path -LiteralPath $projectRoot)) {
     New-Item -ItemType Directory -Force -Path $projectRoot | Out-Null
+}
+
+$repositoryInfo = Get-GitHubRepositoryInfo $projectRoot
+if ($null -eq $repositoryInfo) {
+    $repositoryInfo = Get-GitHubRepositoryInfo (Get-Location)
+}
+
+$repositoryName = Split-Path -Leaf $projectRoot
+$repositoryOwner = 'YourName'
+$repositoryUrl = $null
+if ($null -ne $repositoryInfo) {
+    $repositoryName = $repositoryInfo.Name
+    $repositoryOwner = $repositoryInfo.Owner
+    $repositoryUrl = $repositoryInfo.Url
+}
+
+if ([string]::IsNullOrWhiteSpace($Name)) {
+    $Name = ConvertTo-JavaIdentifier $repositoryName
+}
+if ([string]::IsNullOrWhiteSpace($Package)) {
+    $packageOwner = ConvertTo-JavaIdentifier $repositoryOwner -LowerCase
+    $packageName = ConvertTo-JavaIdentifier $repositoryName -LowerCase
+    $Package = "io.github.$packageOwner.$packageName"
+}
+if ($null -eq $Author -or @($Author | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -eq 0) {
+    $Author = @($repositoryOwner)
+}
+if ([string]::IsNullOrWhiteSpace($Website) -and -not [string]::IsNullOrWhiteSpace($repositoryUrl)) {
+    $Website = $repositoryUrl
+}
+
+if ($Name -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+    throw "Name must be a valid Java class name, but was '$Name'."
+}
+if ($Package -notmatch '^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$') {
+    throw "Package must be a valid Java package name, but was '$Package'."
 }
 
 $packagePath = $Package.Replace('.', [System.IO.Path]::DirectorySeparatorChar)
