@@ -179,6 +179,7 @@ $packagePath = $Package.Replace('.', [System.IO.Path]::DirectorySeparatorChar)
 $javaDirectory = Join-Path $projectRoot "src/main/java/$packagePath"
 $javaFile = Join-Path $javaDirectory "$Name.java"
 $pomFile = Join-Path $projectRoot 'pom.xml'
+$readmeFile = Join-Path $projectRoot 'README.md'
 $ideaDirectory = Join-Path $projectRoot '.idea'
 $ideaWorkspaceFile = Join-Path $ideaDirectory 'workspace.xml'
 $githubWorkflowDirectory = Join-Path $projectRoot '.github/workflows'
@@ -351,6 +352,12 @@ $ideaWorkspace = @'
 </project>
 '@
 
+$readme = @"
+# $Name
+
+A plugin for [PowerNukkitX](github.com/PowerNukkitX/PowerNukkitX)
+"@
+
 $githubWorkflow = @'
 name: Build and Release
 
@@ -433,6 +440,7 @@ jobs:
 
 Write-Utf8NoBom $pomFile $pom
 Write-Utf8NoBom $javaFile $javaSource
+Write-Utf8NoBom $readmeFile $readme
 Write-Utf8NoBom $githubWorkflowFile $githubWorkflow
 if ($Force -or -not (Test-Path -LiteralPath $ideaWorkspaceFile)) {
     Write-Utf8NoBom $ideaWorkspaceFile $ideaWorkspace
