@@ -446,8 +446,6 @@ if ($Force -or -not (Test-Path -LiteralPath $ideaWorkspaceFile)) {
     Write-Utf8NoBom $ideaWorkspaceFile $ideaWorkspace
 }
 
-Write-Host "Created $Name in $projectRoot"
-
 $runConfigurationDirectory = Join-Path $projectRoot '.run'
 if (Test-Path -LiteralPath $runConfigurationDirectory) {
     Remove-Item -LiteralPath $runConfigurationDirectory -Recurse -Force
@@ -456,3 +454,31 @@ if (Test-Path -LiteralPath $runConfigurationDirectory) {
 if (-not [string]::IsNullOrWhiteSpace($PSCommandPath) -and (Test-Path -LiteralPath $PSCommandPath)) {
     Remove-Item -LiteralPath $PSCommandPath -Force
 }
+
+$gitRoot = git -C $projectRoot rev-parse --show-toplevel 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitRoot)) {
+    throw "Generated project, but could not stage changes because '$projectRoot' is not inside a Git repository."
+}
+
+git -C $gitRoot.Trim() add -A
+if ($LASTEXITCODE -ne 0) {
+    throw "Generated project, but failed to stage changes."
+}
+
+git -C $gitRoot.Trim() diff --cached --quiet
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "No staged changes to commit."
+}
+elseif ($LASTEXITCODE -eq 1) {
+    git -C $gitRoot.Trim() commit --quiet -m "Generate plugin project"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Generated project and staged changes, but failed to commit."
+    }
+}
+else {
+    throw "Generated project and staged changes, but failed to check staged changes."
+}
+
+Write-Host "Created $Name in $projectRoot"
+
+exit 0
