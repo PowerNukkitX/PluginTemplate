@@ -5,22 +5,22 @@ PowerShell script for generating a minimal PowerNukkitX plugin project.
 ## Quick Start
 
 Create a new repository from this GitHub template, clone your new repository, open it in IntelliJ, then run the `Generate Plugin` run configuration.
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
 
+## Optional Metadata
 You can also run the generator from PowerShell in the repository root:
 
 ```powershell
 .\generate.ps1
 ```
-
 The script creates a Maven plugin project using defaults from the GitHub `origin` remote.
 
 After generation, import the Maven project when prompted. The generator script deletes itself after a successful run.
-<br>
-<br>
-<br>
-<br>
-<br>
-## Optional Metadata
 
 `Author` is optional and defaults to the GitHub repository owner when available:
 
