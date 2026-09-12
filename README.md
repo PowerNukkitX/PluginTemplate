@@ -76,6 +76,7 @@ Force
 ## Build The Plugin
 
 Open the directory in IntelliJ or run Maven there:
+Use JDK 25 and set the IntelliJ project SDK and Maven runner JDK to Java 25.
 
 ```powershell
 mvn package

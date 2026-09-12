@@ -157,9 +157,8 @@ if ([string]::IsNullOrWhiteSpace($Name)) {
     $Name = ConvertTo-JavaIdentifier $repositoryName
 }
 if ([string]::IsNullOrWhiteSpace($Package)) {
-    $packageOwner = ConvertTo-JavaIdentifier $repositoryOwner -LowerCase
     $packageName = ConvertTo-JavaIdentifier $repositoryName -LowerCase
-    $Package = "io.github.$packageOwner.$packageName"
+    $Package = "org.powernukkitx.$packageName"
 }
 if ($null -eq $Author -or @($Author | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -eq 0) {
     $Author = @($repositoryOwner)
@@ -271,8 +270,8 @@ $pom = @"
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
     </properties>
 
     <repositories>
@@ -356,6 +355,8 @@ $readme = @"
 # $Name
 
 A plugin for [PowerNukkitX](github.com/PowerNukkitX/PowerNukkitX)
+
+Requires Java 25. Build with Maven using JDK 25.
 "@
 
 $githubWorkflow = @'
@@ -386,7 +387,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '25'
 
       - name: Build with Maven
         run: mvn -B package -DskipTests=false -Darguments="-Dmaven.javadoc.skip=true"
